@@ -1,68 +1,61 @@
-"""MaxMind gate decisions. No network and no database."""
-from app.services.geo import assess_insights, extract_client_ip, is_public_ip
+"""ipapi.is gate decisions. No network and no database."""
+from app.services.geo import assess_lookup, extract_client_ip, is_public_ip
 
 
 def _uae(**extra):
-    data = {"country": {"iso_code": "AE"}, "traits": {}}
+    data = {
+        "location": {"country_code": "AE"},
+        "is_vpn": False,
+        "is_proxy": False,
+        "is_tor": False,
+        "is_datacenter": False,
+        "is_abuser": False,
+    }
     data.update(extra)
     return data
 
 
 def test_uae_clean_ip_is_allowed():
-    verdict = assess_insights(_uae(), 5.0)
+    verdict = assess_lookup(_uae())
     assert verdict.allowed
     assert verdict.code == "ok"
 
 
 def test_outside_uae_is_blocked():
-    verdict = assess_insights({"country": {"iso_code": "US"}, "traits": {}}, 5.0)
+    verdict = assess_lookup(_uae(location={"country_code": "US"}))
     assert not verdict.allowed
     assert verdict.code == "outside_uae"
 
 
 def test_missing_country_is_blocked():
-    verdict = assess_insights({}, 5.0)
+    verdict = assess_lookup(_uae(location=None))
     assert verdict.code == "outside_uae"
 
 
 def test_uae_vpn_is_blocked():
-    verdict = assess_insights(
-        _uae(anonymizer={"is_anonymous_vpn": True, "provider_name": "nordvpn"}),
-        5.0,
-    )
+    verdict = assess_lookup(_uae(is_vpn=True))
     assert verdict.code == "vpn"
 
 
-def test_legacy_traits_vpn_flag_is_blocked():
-    verdict = assess_insights(_uae(traits={"is_anonymous_vpn": True}), 5.0)
+def test_truthy_vpn_string_is_blocked():
+    verdict = assess_lookup(_uae(is_vpn="yes"))
     assert verdict.code == "vpn"
 
 
-def test_proxy_tor_and_hosting_are_suspicious():
-    for flag in (
-        "is_public_proxy",
-        "is_residential_proxy",
-        "is_tor_exit_node",
-        "is_hosting_provider",
-        "is_anonymous",
-    ):
-        verdict = assess_insights(_uae(anonymizer={flag: True}), 5.0)
+def test_proxy_tor_datacenter_and_abuser_are_suspicious():
+    for flag in ("is_proxy", "is_tor", "is_datacenter", "is_abuser"):
+        verdict = assess_lookup(_uae(**{flag: True}))
         assert verdict.code == "suspicious", flag
 
 
-def test_high_risk_snapshot_is_suspicious():
-    verdict = assess_insights(_uae(traits={"ip_risk_snapshot": 12.5}), 5.0)
-    assert verdict.code == "suspicious"
+def test_keyless_response_without_flags_is_blocked():
+    verdict = assess_lookup({"country": "United Arab Emirates", "docs": "https://ipapi.is/free-tier.html"})
+    assert verdict.code == "unavailable"
 
 
-def test_omitted_risk_snapshot_is_low_risk():
-    verdict = assess_insights(_uae(traits={"isp": "Etisalat"}), 5.0)
-    assert verdict.allowed
-
-
-def test_risk_just_under_threshold_is_allowed():
-    verdict = assess_insights(_uae(traits={"ip_risk_snapshot": 4.99}), 5.0)
-    assert verdict.allowed
+def test_api_error_is_blocked():
+    verdict = assess_lookup({"error": "quota", "error_code": "ERR_QUOTA_EXCEEDED"})
+    assert verdict.code == "unavailable"
 
 
 def test_forwarded_for_uses_the_last_hop():

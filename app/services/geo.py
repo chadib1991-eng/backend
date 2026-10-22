@@ -1,9 +1,12 @@
 """
-MaxMind GeoIP Insights gate for checkout.
+ipapi.is gate for checkout.
 
-An order is allowed only when the client IP is in the UAE, is not a VPN,
-proxy, Tor exit, or hosting network, and its IP risk snapshot is under the
-configured threshold. One test phone can skip the check.
+An order is allowed only when the client IP is in the UAE and is not a VPN,
+proxy, Tor exit, datacenter, or known abuser. One test phone can skip the check.
+
+The free plan is 1,000 lookups a day and includes commercial use. A key is
+required: keyless responses omit the VPN and proxy flags.
+https://ipapi.is/developers.html
 """
 from __future__ import annotations
 
@@ -11,7 +14,6 @@ import ipaddress
 import logging
 from dataclasses import dataclass
 from typing import Mapping
-from urllib.parse import quote
 
 import httpx
 
@@ -20,12 +22,14 @@ from app.services.phone import parse_uae_mobile
 
 logger = logging.getLogger(__name__)
 
-_INSIGHTS_URL = "https://geoip.maxmind.com/geoip/v2.1/insights/{ip}"
+_LOOKUP_URL = "https://api.ipapi.is"
 
 MSG_OUTSIDE = "الطلب متاح داخل الإمارات فقط"
 MSG_VPN = "طفي الـ VPN وجربي مرة ثانية. الطلب داخل الإمارات بس"
 MSG_SUSPICIOUS = "ما نقدر نأكد الطلب من هذا الاتصال. جربي بيانات الجوال أو واي فاي البيت"
 MSG_UNAVAILABLE = "ما قدرنا نتأكد من الاتصال. جربي بعد شوي"
+
+_SUSPICIOUS_FLAGS = ("is_proxy", "is_tor", "is_datacenter", "is_abuser")
 
 
 @dataclass(frozen=True)
@@ -86,84 +90,73 @@ def is_bypass_phone(e164: str) -> bool:
     return e164 in allowed
 
 
-def _flag(data: dict, key: str) -> bool:
-    for section in ("anonymizer", "traits"):
-        block = data.get(section)
-        if isinstance(block, dict) and block.get(key):
-            return True
-    return False
+def _on(value: object) -> bool:
+    """ipapi.is says is_vpn can be truthy without being JSON true."""
+    if isinstance(value, str):
+        return value.strip().lower() not in {"", "0", "false", "no", "null"}
+    return bool(value)
 
 
-def assess_insights(data: dict, risk_threshold: float) -> GeoVerdict:
-    country = data.get("country") if isinstance(data.get("country"), dict) else {}
-    iso = str(country.get("iso_code") or "").upper()
+def assess_lookup(data: dict) -> GeoVerdict:
+    if data.get("error") or data.get("error_code"):
+        return GeoVerdict(False, "unavailable", MSG_UNAVAILABLE)
+    if data.get("is_bogon"):
+        return GeoVerdict(False, "unavailable", MSG_UNAVAILABLE)
+    # Keyless responses have a country and no detection flags. Do not treat that as clean.
+    if "is_vpn" not in data or "is_proxy" not in data:
+        return GeoVerdict(False, "unavailable", MSG_UNAVAILABLE)
+
+    location = data.get("location") if isinstance(data.get("location"), dict) else {}
+    iso = str(location.get("country_code") or "").upper()
     if iso != "AE":
         return GeoVerdict(False, "outside_uae", MSG_OUTSIDE)
 
-    if _flag(data, "is_anonymous_vpn"):
+    if _on(data.get("is_vpn")):
         return GeoVerdict(False, "vpn", MSG_VPN)
 
-    suspicious_flags = (
-        "is_anonymous",
-        "is_public_proxy",
-        "is_residential_proxy",
-        "is_tor_exit_node",
-        "is_hosting_provider",
-    )
-    if any(_flag(data, key) for key in suspicious_flags):
+    if any(_on(data.get(flag)) for flag in _SUSPICIOUS_FLAGS):
         return GeoVerdict(False, "suspicious", MSG_SUSPICIOUS)
-
-    traits = data.get("traits") if isinstance(data.get("traits"), dict) else {}
-    raw_score = traits.get("ip_risk_snapshot")
-    if raw_score is not None:
-        try:
-            score = float(raw_score)
-        except (TypeError, ValueError):
-            score = None
-        if score is not None and score >= risk_threshold:
-            return GeoVerdict(False, "suspicious", MSG_SUSPICIOUS)
 
     return GeoVerdict(True, "ok", "")
 
 
 def check_order_ip(ip: str) -> GeoVerdict:
-    """Call MaxMind. Any failure blocks the order."""
-    if not settings.maxmind_account_id or not settings.maxmind_license_key:
-        logger.error("MaxMind credentials are missing; blocking checkout")
+    """Call ipapi.is. Any failure blocks the order."""
+    if not settings.ipapi_key:
+        logger.error("IPAPI_KEY is missing; blocking checkout")
         return GeoVerdict(False, "unavailable", MSG_UNAVAILABLE)
 
     if not is_public_ip(ip):
         logger.warning("Checkout IP is not a public address: %s", ip or "(empty)")
         return GeoVerdict(False, "unavailable", MSG_UNAVAILABLE)
 
-    url = _INSIGHTS_URL.format(ip=quote(ip, safe=":"))
     try:
-        response = httpx.get(
-            url,
-            auth=(settings.maxmind_account_id, settings.maxmind_license_key),
+        response = httpx.post(
+            _LOOKUP_URL,
+            json={"q": ip, "key": settings.ipapi_key},
             headers={"Accept": "application/json"},
             timeout=4.0,
         )
     except httpx.HTTPError as exc:
-        logger.warning("MaxMind request failed for %s: %s", ip, exc)
-        return GeoVerdict(False, "unavailable", MSG_UNAVAILABLE)
-
-    if response.status_code != 200:
-        logger.warning(
-            "MaxMind HTTP %s for %s: %s",
-            response.status_code,
-            ip,
-            response.text[:200],
-        )
+        logger.warning("ipapi.is request failed for %s: %s", ip, exc)
         return GeoVerdict(False, "unavailable", MSG_UNAVAILABLE)
 
     try:
         payload = response.json()
     except ValueError:
-        logger.warning("MaxMind returned non-JSON for %s", ip)
+        logger.warning("ipapi.is returned non-JSON for %s (HTTP %s)", ip, response.status_code)
         return GeoVerdict(False, "unavailable", MSG_UNAVAILABLE)
 
-    verdict = assess_insights(payload, settings.maxmind_risk_threshold)
+    if response.status_code != 200 or not isinstance(payload, dict):
+        logger.warning(
+            "ipapi.is HTTP %s for %s: %s",
+            response.status_code,
+            ip,
+            str(payload)[:200],
+        )
+        return GeoVerdict(False, "unavailable", MSG_UNAVAILABLE)
+
+    verdict = assess_lookup(payload)
     if not verdict.allowed:
         logger.info("Checkout blocked ip=%s code=%s", ip, verdict.code)
     return verdict

@@ -24,11 +24,8 @@ class Settings(BaseSettings):
     snap_pixel_id: str = ""
     snap_capi_token: str = ""
 
-    # GeoIP Insights basic auth. Account ID is the username, license key is the API key.
-    maxmind_account_id: str = ""
-    maxmind_license_key: str = ""
-    # Block when traits.ip_risk_snapshot is at or above this (0.01–99).
-    maxmind_risk_threshold: float = 5.0
+    # ipapi.is free key. Required for VPN and proxy flags. https://ipapi.is/
+    ipapi_key: str = ""
     # Comma-separated UAE mobiles that skip the IP check. Default is the test number.
     checkout_bypass_phones: str = "0500000099"
 
