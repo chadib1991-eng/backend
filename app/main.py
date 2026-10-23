@@ -1,6 +1,6 @@
 """
 صَبا (Saba) — FastAPI application factory.
-Migrations run in entrypoint.sh (alembic upgrade head), not here.
+The database schema is managed outside this service.
 The sweeper loop runs in the lifespan.
 """
 from __future__ import annotations
