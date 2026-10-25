@@ -20,32 +20,81 @@ logger = logging.getLogger(__name__)
 _DUBAI_TZ_OFFSET = 4  # UTC+4, no DST
 
 
-def _dubai_format(dt: datetime) -> str:
-    """Format a UTC datetime as YYYY-MM-DD HH:mm in Asia/Dubai (UTC+4)."""
+# Stable catalog SKUs. Lines saved before sku was stored still resolve.
+_SKU_BY_SLUG = {
+    "razaz-al-shaar": "SABA-MIST",
+    "kareem-al-intiash": "SABA-CREAM",
+    "qalam-al-kaab": "SABA-HEEL",
+}
+
+
+def _dubai_parts(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     ts = dt.timestamp() + _DUBAI_TZ_OFFSET * 3600
-    d = datetime.utcfromtimestamp(ts)
-    return d.strftime("%Y-%m-%d %H:%M")
+    return datetime.utcfromtimestamp(ts)
 
 
-def _items_ar(lines: list[dict]) -> str:
+def _dubai_date(dt: datetime) -> str:
+    """Sheet date column: 01/04/2026, Dubai calendar day."""
+    return _dubai_parts(dt).strftime("%d/%m/%Y")
+
+
+def _sheet_order_id(public_id: str) -> str:
+    """SB-100241 becomes saba100241. Already-prefixed ids are kept."""
+    text = (public_id or "").strip()
+    if text.lower().startswith("saba"):
+        return "saba" + text[4:]
+    digits = ""
+    for char in reversed(text):
+        if char.isdigit():
+            digits = char + digits
+        elif digits:
+            break
+    return f"saba{digits}" if digits else f"saba{text}"
+
+
+def _sheet_phone(phone_e164: str) -> str:
+    raw = (phone_e164 or "").strip().replace(" ", "")
+    if raw.startswith("+"):
+        return raw
+    if raw.startswith("971"):
+        return f"+{raw}"
+    if raw.startswith("0") and len(raw) == 10:
+        return f"+971{raw[1:]}"
+    return raw
+
+
+def _line_sku(line: dict) -> str:
+    sku = (line.get("sku") or "").strip()
+    if sku:
+        return sku
+    return _SKU_BY_SLUG.get(line.get("slug") or "", line.get("slug") or "")
+
+
+def order_sheet_row(order: "Order") -> dict:
     """
-    Human-readable Arabic summary of the order lines.
-    Example: رذاذ ماء الإمارات × قطعتين (279) + كريم الانتعاش × قطعة عرض (99)
+    One row for the orders sheet.
+
+    date, orderid, country, name, phone, product, sku, quantity,
+    totalprice, currency are filled. status is always empty.
+    Several products are joined with slashes: name/name and 2/2/2.
     """
-    pieces_ar = {1: "قطعة", 2: "قطعتين", 3: "٣ قطع"}
-    parts = []
-    for line in lines:
-        name = line.get("name_ar", line["slug"])
-        pieces = line["pieces"]
-        price = line["unit_price_aed"]
-        if line.get("is_upsell"):
-            parts.append(f"{name} × قطعة عرض ({price})")
-        else:
-            label = pieces_ar.get(pieces, f"{pieces} قطع")
-            parts.append(f"{name} × {label} ({price})")
-    return " + ".join(parts)
+    lines = list(order.lines or [])
+    total = order.total_aed if order.total_aed is not None else order.merchandise_aed
+    return {
+        "date": _dubai_date(order.created_at),
+        "orderid": _sheet_order_id(order.public_id),
+        "country": "uae",
+        "name": order.customer_name,
+        "phone": _sheet_phone(order.phone_e164),
+        "product": "/".join((line.get("name_ar") or line.get("slug") or "") for line in lines),
+        "sku": "/".join(_line_sku(line) for line in lines),
+        "quantity": "/".join(str(line.get("pieces") or 1) for line in lines),
+        "totalprice": total,
+        "currency": "AED",
+        "status": "",
+    }
 
 
 def push_order(order: "Order") -> None:
@@ -53,41 +102,10 @@ def push_order(order: "Order") -> None:
     if not settings.sheets_webhook_url:
         return
 
-    attr = order.attribution or {}
     body = {
         "record_type": "order",
         "secret": settings.sheets_webhook_secret,
-        "order_id": order.public_id,
-        "created_at_dubai": _dubai_format(order.created_at),
-        "status": order.status,
-        "customer_name": order.customer_name,
-        "phone_e164": order.phone_e164,
-        "phone_local": order.phone_local,
-        "items_ar": _items_ar(order.lines),
-        "lines_json": str(order.lines),
-        "upsell_accepted": order.upsell_accepted or False,
-        "upsell_product_slug": order.upsell_slug or "",
-        "upsell_price_aed": 99 if order.upsell_accepted else "",
-        "merchandise_aed": order.merchandise_aed,
-        "total_aed": order.total_aed,
-        "currency": "AED",
-        "payment_method": "COD",
-        "event_id": order.event_id,
-        "landing_url": order.landing_url or "",
-        "utm_source": attr.get("utm_source", ""),
-        "utm_medium": attr.get("utm_medium", ""),
-        "utm_campaign": attr.get("utm_campaign", ""),
-        "utm_content": attr.get("utm_content", ""),
-        "utm_term": attr.get("utm_term", ""),
-        "fbclid": attr.get("fbclid", ""),
-        "fbp": attr.get("fbp", ""),
-        "fbc": attr.get("fbc", ""),
-        "ttclid": attr.get("ttclid", ""),
-        "ttp": attr.get("ttp", ""),
-        "sc_click_id": attr.get("sc_click_id", ""),
-        "sc_cookie": attr.get("sc_cookie", ""),
-        "client_ip": order.client_ip or "",
-        "user_agent": order.user_agent or "",
+        **order_sheet_row(order),
     }
 
     headers = {

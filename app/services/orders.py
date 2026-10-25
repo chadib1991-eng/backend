@@ -23,6 +23,7 @@ def build_line(product: Product, offer_code: str, is_upsell: bool = False) -> di
     pieces, price_aed = price_for(product, offer_code)
     return {
         "slug": product.slug,
+        "sku": product.sku,
         "name_ar": product.name_ar,
         "offer_code": offer_code,
         "pieces": pieces,
