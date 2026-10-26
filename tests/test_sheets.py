@@ -14,9 +14,9 @@ def _order():
         total_aed=478,
         merchandise_aed=279,
         lines=[
-            {"slug": "razaz-al-shaar", "name_ar": "رذاذ ماء الإمارات", "sku": "SABA-MIST", "pieces": 2},
-            {"slug": "kareem-al-intiash", "name_ar": "كريم الانتعاش لكامل الجسم", "sku": "SABA-CREAM", "pieces": 2},
-            {"slug": "qalam-al-kaab", "name_ar": "قلم الكعب المشقق", "pieces": 1},
+            {"slug": "balasm-al-shaar", "name_ar": "رذاذ بلسم الشعر الخفيف", "sku": "SABA-LEAVEIN", "pieces": 2},
+            {"slug": "loshn-al-jism", "name_ar": "لوشن ترطيب الجسم", "sku": "SABA-LOTION", "pieces": 2},
+            {"slug": "roll-al-kaab", "name_ar": "رول الكعب باليوريا 20%", "pieces": 1},
         ],
     )
 
@@ -29,8 +29,8 @@ def test_sheet_row_matches_orders_columns():
         "country": "uae",
         "name": "ميثة",
         "phone": "+971501234567",
-        "product": "رذاذ ماء الإمارات/كريم الانتعاش لكامل الجسم/قلم الكعب المشقق",
-        "sku": "SABA-MIST/SABA-CREAM/SABA-HEEL",
+        "product": "رذاذ بلسم الشعر الخفيف/لوشن ترطيب الجسم/رول الكعب باليوريا 20%",
+        "sku": "SABA-LEAVEIN/SABA-LOTION/SABA-FOOTROLL",
         "quantity": "2/2/1",
         "totalprice": 478,
         "currency": "AED",

@@ -48,10 +48,10 @@ def test_start_creates_pending(db):
     from app.services.orders import build_line, create_order
     from app.services.pricing import choose_upsell
 
-    product = _mock_product(db, "razaz-al-shaar")
+    product = _mock_product(db, "balasm-al-shaar")
     line = build_line(product, "2")
     all_slugs = [p.slug for p in db.query(Product).all()]
-    upsell_slug = choose_upsell(["razaz-al-shaar"], all_slugs)
+    upsell_slug = choose_upsell(["balasm-al-shaar"], all_slugs)
 
     order = create_order(
         db,
@@ -80,10 +80,10 @@ def test_complete_idempotent(db):
     from app.services.orders import build_line, create_order, complete_order
     from app.services.pricing import choose_upsell
 
-    product = _mock_product(db, "kareem-al-intiash")
+    product = _mock_product(db, "loshn-al-jism")
     line = build_line(product, "1")
     all_slugs = [p.slug for p in db.query(Product).all()]
-    upsell_slug = choose_upsell(["kareem-al-intiash"], all_slugs)
+    upsell_slug = choose_upsell(["loshn-al-jism"], all_slugs)
 
     order = create_order(
         db,
@@ -117,10 +117,10 @@ def test_upsell_adds_99(db):
     from app.services.orders import build_line, create_order, complete_order
     from app.services.pricing import choose_upsell
 
-    product = _mock_product(db, "razaz-al-shaar")
+    product = _mock_product(db, "balasm-al-shaar")
     line = build_line(product, "2")  # 279
     all_slugs = [p.slug for p in db.query(Product).all()]
-    upsell_slug = choose_upsell(["razaz-al-shaar"], all_slugs)
+    upsell_slug = choose_upsell(["balasm-al-shaar"], all_slugs)
     assert upsell_slug is not None
 
     order = create_order(
@@ -152,7 +152,7 @@ def test_client_price_ignored(db):
     from app.models import Product
     from app.services.pricing import price_for
 
-    product = _mock_product(db, "razaz-al-shaar")
+    product = _mock_product(db, "balasm-al-shaar")
     # Even if a client sent price: 1, the backend uses catalog
     _, price = price_for(product, "2")
     assert price == 279  # catalog price, not 1

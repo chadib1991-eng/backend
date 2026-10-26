@@ -17,6 +17,9 @@ from app.routers import catalog, checkout, events, contact, admin
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from app.catalog_seed import sync_catalog
+
+    sync_catalog()
     stop = asyncio.Event()
     task = asyncio.create_task(sweep_loop(stop))
     yield

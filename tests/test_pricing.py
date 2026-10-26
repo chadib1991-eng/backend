@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 from app.services.pricing import price_for, choose_upsell
 
 
-def make_product(slug="razaz-al-shaar", price_1=199, price_2=279, price_3=349, upsell=99):
+def make_product(slug="balasm-al-shaar", price_1=199, price_2=279, price_3=349, upsell=99):
     p = MagicMock()
     p.slug = slug
     p.price_1 = price_1
@@ -51,30 +51,30 @@ def test_price_for_unknown():
         price_for(p, "4")
 
 
-def test_upsell_picker_cream_first():
-    """Cream is offered first when mist is in the cart."""
-    all_slugs = ["razaz-al-shaar", "kareem-al-intiash", "qalam-al-kaab"]
-    upsell = choose_upsell(["razaz-al-shaar"], all_slugs)
-    assert upsell == "kareem-al-intiash"
+def test_upsell_picker_lotion_first():
+    """Lotion is offered first when the hair mist is in the cart."""
+    all_slugs = ["balasm-al-shaar", "loshn-al-jism", "roll-al-kaab"]
+    upsell = choose_upsell(["balasm-al-shaar"], all_slugs)
+    assert upsell == "loshn-al-jism"
 
 
 def test_upsell_picker_mist_second():
-    """Mist is offered when cream and heel are in the cart."""
-    all_slugs = ["razaz-al-shaar", "kareem-al-intiash", "qalam-al-kaab"]
-    upsell = choose_upsell(["kareem-al-intiash", "qalam-al-kaab"], all_slugs)
-    assert upsell == "razaz-al-shaar"
+    """Hair mist is offered when lotion and foot roll are in the cart."""
+    all_slugs = ["balasm-al-shaar", "loshn-al-jism", "roll-al-kaab"]
+    upsell = choose_upsell(["loshn-al-jism", "roll-al-kaab"], all_slugs)
+    assert upsell == "balasm-al-shaar"
 
 
 def test_upsell_picker_heel_last():
-    """Heel is offered last when only heel is missing."""
-    all_slugs = ["razaz-al-shaar", "kareem-al-intiash", "qalam-al-kaab"]
-    upsell = choose_upsell(["razaz-al-shaar", "kareem-al-intiash"], all_slugs)
-    assert upsell == "qalam-al-kaab"
+    """Foot roll is offered last when only it is missing."""
+    all_slugs = ["balasm-al-shaar", "loshn-al-jism", "roll-al-kaab"]
+    upsell = choose_upsell(["balasm-al-shaar", "loshn-al-jism"], all_slugs)
+    assert upsell == "roll-al-kaab"
 
 
 def test_upsell_picker_none_when_full():
     """No upsell when all three products are in the cart."""
-    all_slugs = ["razaz-al-shaar", "kareem-al-intiash", "qalam-al-kaab"]
+    all_slugs = ["balasm-al-shaar", "loshn-al-jism", "roll-al-kaab"]
     upsell = choose_upsell(all_slugs, all_slugs)
     assert upsell is None
 

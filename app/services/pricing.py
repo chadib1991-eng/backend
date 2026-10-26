@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from app.models import Product
 
-# Upsell priority: cream first, mist second, heel third (docs/03)
-UPSELL_PRIORITY = ["kareem-al-intiash", "razaz-al-shaar", "qalam-al-kaab"]
+# Upsell priority: lotion first, hair mist second, foot roll third
+UPSELL_PRIORITY = ["loshn-al-jism", "balasm-al-shaar", "roll-al-kaab"]
 
 
 def price_for(product: "Product", offer_code: str) -> tuple[int, int]:

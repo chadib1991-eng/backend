@@ -1,15 +1,53 @@
 """
-Seed data for the initial migration. Matches docs/03, docs/06, docs/19.
-Upsell priority (from checkout logic): cream first, mist second, heel third.
-Sort order for menus: mist 1, cream 2, heel 3.
+Catalog source of truth for the three products on the shelf.
+
+1. Weightless leave-in conditioning hair mist, 100 ml
+2. Moisturizing body lotion, 160 g — niacinamide, PDRN, hyaluronic acid, shea, ocean breeze
+3. 20% urea foot roll-on, 50 ml — vitamin E and olive oil
+
+Upsell priority: lotion first, hair mist second, foot roll third.
+Sort order for menus: hair mist 1, lotion 2, foot roll 3.
 """
+from __future__ import annotations
+
+import logging
+
+from sqlalchemy import select
+
+logger = logging.getLogger(__name__)
+
+HAIR = "balasm-al-shaar"
+LOTION = "loshn-al-jism"
+FOOT = "roll-al-kaab"
+
+HAIR_INGREDIENTS = [
+    {"name": "بلسم بدون شطف", "detail": "رذاذ يُترك على الشعر. 100 مل. ما يحتاج شطف."},
+    {"name": "ترطيب", "detail": "مكتوب على العبوة. يرطّب الشعر من غير ما يثقله."},
+    {"name": "ضد الهيشان", "detail": "يهدّي مظهر الشعر الهايش بعد الحر والمكيف."},
+    {"name": "فك التشابك", "detail": "يساعد المشط يمشي على الشعر بسهولة."},
+]
+
+LOTION_INGREDIENTS = [
+    {"name": "نياسيناميد", "detail": "مكتوب على العبوة. مكوّن معروف بدعم مظهر البشرة مع الاستخدام المنتظم."},
+    {"name": "PDRN", "detail": "مكتوب على العبوة مع الهيالورون. مكوّن ترطيب في عناية الجسم."},
+    {"name": "حمض الهيالورونيك", "detail": "يمسك الرطوبة على البشرة."},
+    {"name": "زبدة الشيا", "detail": "تغذية ناعمة. اللوشن غير دهني."},
+    {"name": "نسيم البحر", "detail": "ريحة العبوة. خفيفة، مو عطر ثقيل."},
+]
+
+FOOT_INGREDIENTS = [
+    {"name": "يوريا 20%", "detail": "المكوّن المكتوب على العبوة لترطيب الكعب الجاف والخشن."},
+    {"name": "فيتامين E", "detail": "مع اليوريا في التركيبة."},
+    {"name": "زيت الزيتون", "detail": "انزلاق الرول وترطيب الموضع."},
+    {"name": "خالي من البارابين", "detail": "مكتوب على العبوة."},
+]
 
 PRODUCTS = [
     {
-        "slug": "razaz-al-shaar",
-        "sku": "SABA-MIST",
-        "nav_ar": "رذاذ الشعر",
-        "name_ar": "رذاذ ماء الإمارات",
+        "slug": HAIR,
+        "sku": "SABA-LEAVEIN",
+        "nav_ar": "بلسم الشعر",
+        "name_ar": "رذاذ بلسم الشعر الخفيف",
         "category": "hair",
         "price_1": 199,
         "price_2": 279,
@@ -19,25 +57,14 @@ PRODUCTS = [
         "scarcity_threshold": 25,
         "active": True,
         "sort": 1,
-        "ingredients": [
-            {"name": "ماء مُصفّى", "detail": "قاعدة الرذاذ. خفيفة وما تترك طبقة."},
-            {"name": "جليسرين نباتي", "detail": "يمسك الرطوبة على الشعر الجاف من المكيف."},
-            {"name": "بانثينول", "detail": "برو-فيتامين B5، معروف إنه يخلي الشعر أهدى للمس."},
-            {"name": "مستخلص صبار", "detail": "لمسة ترطيب خفيفة."},
-            {"name": "عطر خفيف", "detail": "ريحة نظيفة، مو عطر ثقيل."},
-        ],
-        "images": [
-            "/images/mist-1.jpg",
-            "/images/mist-2.jpg",
-            "/images/mist-3.jpg",
-            "/images/mist-4.jpg",
-        ],
+        "ingredients": HAIR_INGREDIENTS,
+        "images": ["/images/hair-mist.png"],
     },
     {
-        "slug": "kareem-al-intiash",
-        "sku": "SABA-CREAM",
-        "nav_ar": "كريم الانتعاش",
-        "name_ar": "كريم الانتعاش لكامل الجسم",
+        "slug": LOTION,
+        "sku": "SABA-LOTION",
+        "nav_ar": "لوشن الجسم",
+        "name_ar": "لوشن ترطيب الجسم",
         "category": "body",
         "price_1": 199,
         "price_2": 279,
@@ -47,25 +74,14 @@ PRODUCTS = [
         "scarcity_threshold": 25,
         "active": True,
         "sort": 2,
-        "ingredients": [
-            {"name": "جل خفيف سريع الامتصاص", "detail": "عشان ما يبقى فيلم تحت العباية."},
-            {"name": "جليسرين", "detail": "يرطّب الطبقة الخارجية من البشرة."},
-            {"name": "زبدة شيا", "detail": "تغذية ناعمة من غير ثقل كريمات الليل."},
-            {"name": "نياسيناميد", "detail": "مكوّن معروف بدعم مظهر البشرة مع الاستخدام المنتظم."},
-            {"name": "إحساس انتعاش خفيف", "detail": "برودة لطيفة. مو حرقة، ومو منتج طبي للتعرق."},
-        ],
-        "images": [
-            "/images/cream-1.jpg",
-            "/images/cream-2.jpg",
-            "/images/cream-3.jpg",
-            "/images/cream-4.jpg",
-        ],
+        "ingredients": LOTION_INGREDIENTS,
+        "images": ["/images/body-lotion.png"],
     },
     {
-        "slug": "qalam-al-kaab",
-        "sku": "SABA-HEEL",
-        "nav_ar": "قلم الكعب",
-        "name_ar": "قلم الكعب المشقق",
+        "slug": FOOT,
+        "sku": "SABA-FOOTROLL",
+        "nav_ar": "رول الكعب",
+        "name_ar": "رول الكعب باليوريا 20%",
         "category": "heel",
         "price_1": 199,
         "price_2": 279,
@@ -75,87 +91,129 @@ PRODUCTS = [
         "scarcity_threshold": 25,
         "active": True,
         "sort": 3,
-        "ingredients": [
-            {"name": "يوريا", "detail": "المكوّن الأكثر استخداماً لترطيب الجلد الجاف والخشن، ومنها الكعب."},
-            {"name": "زبدة شيا", "detail": "تليين للموضع الجاف."},
-            {"name": "زيت لوز حلو", "detail": "انزلاق القلم وقت التطبيق."},
-            {"name": "شمع تجميلي", "detail": "يخلي التركيبة قلم، مو كريم يسيح في الشنطة."},
-        ],
-        "images": [
-            "/images/heel-1.jpg",
-            "/images/heel-2.jpg",
-            "/images/heel-3.jpg",
-            "/images/heel-4.jpg",
-        ],
+        "ingredients": FOOT_INGREDIENTS,
+        "images": ["/images/foot-roll.png"],
     },
 ]
 
-# Nine sample reviews, three per product. source="sample" always shows نموذج ribbon.
+# Sample cards. source="sample" always shows the نموذج ribbon.
 REVIEWS = [
-    # Mist
     {
         "id": "sample-mist-1",
-        "product_slug": "razaz-al-shaar",
+        "product_slug": HAIR,
         "source": "sample",
         "name": "ميثة",
-        "body": "أحطه في الشنطة. الرشة الثانية بعد الدوام هي اللي فرقت معي.",
+        "body": "أرشه في الشنطة. الرشة الثانية بعد الدوام تهدّي الهيشان.",
     },
     {
         "id": "sample-mist-2",
-        "product_slug": "razaz-al-shaar",
+        "product_slug": HAIR,
         "source": "sample",
         "name": "نورة",
-        "body": "ريحته خفيفة. ما أحب العطر القوي في المكتب.",
+        "body": "خفيف على الشعر. ما يثقله ولا يخلّيه مبلول.",
     },
     {
         "id": "sample-mist-3",
-        "product_slug": "razaz-al-shaar",
+        "product_slug": HAIR,
         "source": "sample",
         "name": "عائشة",
-        "body": "استخدمه على الشيلة قبل ما أطلع من السيارة.",
+        "body": "أرشه وأمشط وأطلع. ما يحتاج شطف.",
     },
-    # Cream
     {
         "id": "sample-cream-1",
-        "product_slug": "kareem-al-intiash",
+        "product_slug": LOTION,
         "source": "sample",
         "name": "موزه",
-        "body": "ينشرب وما يخلي العباية تلزق، وهذا كان طلبي.",
+        "body": "ينشرب وما يدهن، وهذا كان طلبي.",
     },
     {
         "id": "sample-cream-2",
-        "product_slug": "kareem-al-intiash",
+        "product_slug": LOTION,
         "source": "sample",
         "name": "فاطمة",
-        "body": "الانتعاش خفيف، مو حرقة.",
+        "body": "ريحة نسيم البحر خفيفة، مو عطر ثقيل.",
     },
     {
         "id": "sample-cream-3",
-        "product_slug": "kareem-al-intiash",
+        "product_slug": LOTION,
         "source": "sample",
         "name": "مريم",
         "body": "صار بعد الشاور مباشرة. كمية صغيرة تكفي.",
     },
-    # Heel
     {
         "id": "sample-heel-1",
-        "product_slug": "qalam-al-kaab",
+        "product_slug": FOOT,
         "source": "sample",
         "name": "ميثة",
-        "body": "أسهل من الجرة، لأني أحطه على الكعب بس.",
+        "body": "أسهل من الجرة، لأني أمرر الرول على الكعب بس.",
     },
     {
         "id": "sample-heel-2",
-        "product_slug": "qalam-al-kaab",
+        "product_slug": FOOT,
         "source": "sample",
         "name": "نورة",
         "body": "حطيته بالليل كم يوم، الكعب صار أهدى للمس.",
     },
     {
         "id": "sample-heel-3",
-        "product_slug": "qalam-al-kaab",
+        "product_slug": FOOT,
         "source": "sample",
         "name": "عائشة",
-        "body": "صغير في الشنطة قبل العزايم.",
+        "body": "صغير في الشنطة قبل الطلعة.",
     },
 ]
+
+
+def sync_catalog() -> None:
+    """
+    Upsert the three live products and hide anything else.
+    Stock and prices stay as they are on an existing row.
+    A new slug gets the seed prices and stock.
+    """
+    from app.db import SessionLocal
+    from app.models import Product, Review
+
+    db = SessionLocal()
+    try:
+        keep = {row["slug"] for row in PRODUCTS}
+        for row in PRODUCTS:
+            product = db.get(Product, row["slug"])
+            created = product is None
+            if created:
+                product = Product(slug=row["slug"])
+                db.add(product)
+            for key in ("sku", "nav_ar", "name_ar", "category", "ingredients", "images", "active", "sort"):
+                setattr(product, key, row[key])
+            if created:
+                for key in (
+                    "price_1",
+                    "price_2",
+                    "price_3",
+                    "upsell_price",
+                    "stock",
+                    "scarcity_threshold",
+                ):
+                    setattr(product, key, row[key])
+        db.flush()
+
+        for rev in REVIEWS:
+            review = db.get(Review, rev["id"])
+            if review is None:
+                review = Review(id=rev["id"])
+                db.add(review)
+            review.product_slug = rev["product_slug"]
+            review.source = rev["source"]
+            review.name = rev["name"]
+            review.body = rev["body"]
+
+        for product in db.scalars(select(Product)).all():
+            if product.slug not in keep:
+                product.active = False
+
+        db.commit()
+        logger.info("catalog synced: %s", ", ".join(sorted(keep)))
+    except Exception:
+        db.rollback()
+        logger.exception("catalog sync failed")
+    finally:
+        db.close()

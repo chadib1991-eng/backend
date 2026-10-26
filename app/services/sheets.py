@@ -21,7 +21,11 @@ _DUBAI_TZ_OFFSET = 4  # UTC+4, no DST
 
 
 # Stable catalog SKUs. Lines saved before sku was stored still resolve.
+# Previous slugs stay so older orders still map to the SKU they shipped as.
 _SKU_BY_SLUG = {
+    "balasm-al-shaar": "SABA-LEAVEIN",
+    "loshn-al-jism": "SABA-LOTION",
+    "roll-al-kaab": "SABA-FOOTROLL",
     "razaz-al-shaar": "SABA-MIST",
     "kareem-al-intiash": "SABA-CREAM",
     "qalam-al-kaab": "SABA-HEEL",
