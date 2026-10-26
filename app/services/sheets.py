@@ -104,14 +104,10 @@ def push_order(order: "Order") -> None:
 
     body = {
         "record_type": "order",
-        "secret": settings.sheets_webhook_secret,
         **order_sheet_row(order),
     }
 
-    headers = {
-        "Content-Type": "application/json",
-        "X-Saba-Secret": settings.sheets_webhook_secret,
-    }
+    headers = {"Content-Type": "application/json"}
 
     for attempt in range(2):
         try:
@@ -147,17 +143,13 @@ def push_contact(name: str, phone_e164: str, phone_local: str, message: str) -> 
         return
     body = {
         "record_type": "contact",
-        "secret": settings.sheets_webhook_secret,
         "customer_name": name,
         "name": name,
         "phone_e164": phone_e164,
         "phone_local": phone_local,
         "message": message,
     }
-    headers = {
-        "Content-Type": "application/json",
-        "X-Saba-Secret": settings.sheets_webhook_secret,
-    }
+    headers = {"Content-Type": "application/json"}
     try:
         with httpx.Client(follow_redirects=True) as client:
             client.post(settings.sheets_webhook_url, json=body, headers=headers, timeout=10.0)

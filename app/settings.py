@@ -9,7 +9,6 @@ class Settings(BaseSettings):
     public_site_url: str = "https://sababreeze.com"
 
     sheets_webhook_url: str = ""
-    sheets_webhook_secret: str = ""
     admin_token: str = ""
 
     meta_pixel_id: str = ""
