@@ -11,6 +11,7 @@ Sort order for menus: hair mist 1, lotion 2, foot roll 3.
 from __future__ import annotations
 
 import logging
+import re
 
 from sqlalchemy import select
 
@@ -19,6 +20,40 @@ logger = logging.getLogger(__name__)
 HAIR = "balasm-al-shaar"
 LOTION = "loshn-al-jism"
 FOOT = "roll-al-kaab"
+
+# Carts saved before the rename. Keep in sync with frontend/lib/slugs.ts and next.config.ts.
+SLUG_ALIASES = {
+    "razaz-al-shaar": HAIR,
+    "kareem-al-intiash": LOTION,
+    "qalam-al-kaab": FOOT,
+}
+
+
+def canonical_slug(slug: str) -> str:
+    text = re.sub(r"\s+", "-", (slug or "").strip().lower())
+    return SLUG_ALIASES.get(text, text)
+
+
+def resolve_cart_lines(lines: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """
+    (slug, offer_code) pairs.
+    A retired slug becomes the live product.
+    If both are in the cart, the live line's offer wins.
+    """
+    order: list[str] = []
+    chosen: dict[str, tuple[str, str]] = {}
+    for slug, offer_code in lines:
+        raw = re.sub(r"\s+", "-", (slug or "").strip().lower())
+        canonical = SLUG_ALIASES.get(raw, raw)
+        if not canonical:
+            continue
+        if canonical not in chosen:
+            order.append(canonical)
+            chosen[canonical] = (canonical, offer_code)
+        elif raw == canonical:
+            chosen[canonical] = (canonical, offer_code)
+    return [chosen[key] for key in order]
+
 
 HAIR_INGREDIENTS = [
     {"name": "بلسم بدون شطف", "detail": "رذاذ يُترك على الشعر. 100 مل. ما يحتاج شطف."},

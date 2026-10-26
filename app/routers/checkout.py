@@ -6,6 +6,8 @@ GET  /api/orders/{public_id} → public order status
 """
 from __future__ import annotations
 import json
+import logging
+import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -16,7 +18,8 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
-from app.db import get_db
+from app.catalog_seed import resolve_cart_lines
+from app.db import SessionLocal, get_db
 from app.models import Order, Product
 from app.services.phone import parse_uae_mobile
 from app.services.pricing import price_for, choose_upsell
@@ -26,6 +29,33 @@ from app.services.capi import send_purchase
 from app.services.sheets import push_order
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _send_order_downstream(public_id: str) -> None:
+    """CAPI and the sheet webhook. Runs after the response so the thank-you page is not blocked."""
+    db = SessionLocal()
+    try:
+        order = db.scalars(select(Order).where(Order.public_id == public_id)).first()
+        if not order:
+            return
+        try:
+            order.capi_status = send_purchase(order)
+            order.capi_sent_at = datetime.now(timezone.utc)
+        except Exception as exc:
+            order.capi_error = str(exc)[:100]
+            logger.exception("capi_failed public_id=%s", public_id)
+        try:
+            push_order(order)
+        except Exception as exc:
+            order.sheet_error = str(exc)[:100]
+            logger.exception("sheet_failed public_id=%s", public_id)
+        db.commit()
+    except Exception:
+        logger.exception("order_downstream_failed public_id=%s", public_id)
+        db.rollback()
+    finally:
+        db.close()
 
 
 # ---------- Request models ----------
@@ -107,7 +137,8 @@ def checkout_start(body: CheckoutStartRequest, request: Request, db: Session = D
     if phone is None:
         return _error("invalid_phone", "اكتبي رقم جوال إماراتي صحيح، مثل 0501234567")
 
-    if not body.lines:
+    resolved_lines = resolve_cart_lines([(line.slug, line.offer_code) for line in body.lines])
+    if not resolved_lines:
         return _error("invalid_line", "السلة فاضية")
 
     peer = request.client.host if request.client else ""
@@ -118,20 +149,26 @@ def checkout_start(body: CheckoutStartRequest, request: Request, db: Session = D
     built_lines: list[dict] = []
     slugs_in_cart: list[str] = []
 
-    for cart_line in body.lines:
-        product = db.get(Product, cart_line.slug)
+    for slug, offer_code in resolved_lines:
+        product = db.get(Product, slug)
         if not product or not product.active:
-            return _error("invalid_line", f"المنتج غير متوفر: {cart_line.slug}")
+            label = product.name_ar if product else ""
+            message = (
+                f"غير متوفر الحين: {label}"
+                if label
+                else "منتج بالسلة ما عاد متوفر. حدّثي الصفحة وحاولي مرة ثانية."
+            )
+            return _error("invalid_line", message)
         if product.stock <= 0:
             return _error("sold_out", f"غير متوفر الحين: {product.name_ar}")
 
         try:
-            line = build_line(product, cart_line.offer_code)
+            line = build_line(product, offer_code)
         except ValueError:
-            return _error("invalid_line", f"كود العرض غير صحيح: {cart_line.offer_code}")
+            return _error("invalid_line", f"كود العرض غير صحيح: {offer_code}")
 
         built_lines.append(line)
-        slugs_in_cart.append(cart_line.slug)
+        slugs_in_cart.append(slug)
 
     # UAE, non-VPN, low-risk IP. The test phone skips this.
     if not is_bypass_phone(phone.e164):
@@ -245,25 +282,15 @@ async def checkout_complete(request: Request, db: Session = Depends(get_db)):
         upsell_product = db.get(Product, order.upsell_slug)
 
     complete_order(db, order, accepted=body.accepted, upsell_product=upsell_product)
+    public_id = order.public_id
     db.commit()
 
-    # After commit: CAPI + sheet (failures recorded, never raise)
-    try:
-        capi_status = send_purchase(order)
-        order.capi_status = capi_status
-        order.capi_sent_at = datetime.now(timezone.utc)
-    except Exception as exc:
-        order.capi_error = str(exc)[:100]
-
-    try:
-        push_order(order)
-    except Exception as exc:
-        order.sheet_error = str(exc)[:100]
-
-    try:
-        db.commit()
-    except Exception:
-        pass
+    # Pixels and the sheet can take many seconds. The order is already confirmed.
+    threading.Thread(
+        target=_send_order_downstream,
+        args=(public_id,),
+        daemon=True,
+    ).start()
 
     return _order_public_fields(order)
 
