@@ -93,7 +93,7 @@ PRODUCTS = [
         "active": True,
         "sort": 1,
         "ingredients": HAIR_INGREDIENTS,
-        "images": ["/images/hair-mist.png"],
+        "images": ["/images/hair-mist.webp"],
     },
     {
         "slug": LOTION,
@@ -110,7 +110,7 @@ PRODUCTS = [
         "active": True,
         "sort": 2,
         "ingredients": LOTION_INGREDIENTS,
-        "images": ["/images/body-lotion.png"],
+        "images": ["/images/body-lotion.webp"],
     },
     {
         "slug": FOOT,
@@ -127,7 +127,7 @@ PRODUCTS = [
         "active": True,
         "sort": 3,
         "ingredients": FOOT_INGREDIENTS,
-        "images": ["/images/foot-roll.png"],
+        "images": ["/images/foot-roll.webp"],
     },
 ]
 
