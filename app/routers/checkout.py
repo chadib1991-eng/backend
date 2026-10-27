@@ -23,7 +23,8 @@ from app.db import SessionLocal, get_db
 from app.models import Order, Product
 from app.services.phone import parse_uae_mobile
 from app.services.pricing import price_for, choose_upsell
-from app.services.geo import extract_client_ip, is_bypass_phone, check_order_ip
+from app.services.geo import extract_client_ip, is_bypass_phone, message_for
+from app.services.ip_cache import qualify_ip
 from app.services.orders import find_duplicate, create_order, complete_order, build_line
 from app.services.capi import send_purchase
 from app.services.sheets import push_order
@@ -80,6 +81,7 @@ class Attribution(BaseModel):
     ttp: str = ""
     sc_click_id: str = ""
     sc_cookie: str = ""
+    gclid: str = ""
     saba_cid: str = ""
 
     model_config = {"extra": "ignore"}
@@ -170,11 +172,11 @@ def checkout_start(body: CheckoutStartRequest, request: Request, db: Session = D
         built_lines.append(line)
         slugs_in_cart.append(slug)
 
-    # UAE, non-VPN, low-risk IP. The test phone skips this.
-    if not is_bypass_phone(phone.e164):
-        verdict = check_order_ip(client_ip)
-        if not verdict.allowed:
-            return _error(verdict.code, verdict.message, 403)
+    # UAE, non-VPN, low-risk IP. The test phone can still order, but a bad IP is not counted.
+    qualified = qualify_ip(db, client_ip)
+    db.commit()
+    if not qualified.allowed and not is_bypass_phone(phone.e164):
+        return _error(qualified.code, message_for(qualified.code), 403)
 
     merchandise_aed = sum(l["unit_price_aed"] for l in built_lines)
 
@@ -235,6 +237,9 @@ def checkout_start(body: CheckoutStartRequest, request: Request, db: Session = D
         attribution=attr,
         client_ip=client_ip,
         user_agent=user_agent,
+        geo_qualified=qualified.allowed,
+        geo_code=qualified.code,
+        country_code=qualified.country_code,
     )
     db.commit()
 

@@ -120,15 +120,20 @@ def assess_lookup(data: dict) -> GeoVerdict:
     return GeoVerdict(True, "ok", "")
 
 
-def check_order_ip(ip: str) -> GeoVerdict:
-    """Call ipapi.is. Any failure blocks the order."""
+def _country_code(payload: dict) -> str:
+    location = payload.get("location") if isinstance(payload.get("location"), dict) else {}
+    return str(location.get("country_code") or "").upper()[:8]
+
+
+def lookup_ip_details(ip: str) -> tuple[GeoVerdict, str]:
+    """Call ipapi.is. Returns the verdict and the ISO country code, when one was sent."""
     if not settings.ipapi_key:
         logger.error("IPAPI_KEY is missing; blocking checkout")
-        return GeoVerdict(False, "unavailable", MSG_UNAVAILABLE)
+        return GeoVerdict(False, "unavailable", MSG_UNAVAILABLE), ""
 
     if not is_public_ip(ip):
         logger.warning("Checkout IP is not a public address: %s", ip or "(empty)")
-        return GeoVerdict(False, "unavailable", MSG_UNAVAILABLE)
+        return GeoVerdict(False, "unavailable", MSG_UNAVAILABLE), ""
 
     try:
         response = httpx.post(
@@ -139,13 +144,13 @@ def check_order_ip(ip: str) -> GeoVerdict:
         )
     except httpx.HTTPError as exc:
         logger.warning("ipapi.is request failed for %s: %s", ip, exc)
-        return GeoVerdict(False, "unavailable", MSG_UNAVAILABLE)
+        return GeoVerdict(False, "unavailable", MSG_UNAVAILABLE), ""
 
     try:
         payload = response.json()
     except ValueError:
         logger.warning("ipapi.is returned non-JSON for %s (HTTP %s)", ip, response.status_code)
-        return GeoVerdict(False, "unavailable", MSG_UNAVAILABLE)
+        return GeoVerdict(False, "unavailable", MSG_UNAVAILABLE), ""
 
     if response.status_code != 200 or not isinstance(payload, dict):
         logger.warning(
@@ -154,9 +159,25 @@ def check_order_ip(ip: str) -> GeoVerdict:
             ip,
             str(payload)[:200],
         )
-        return GeoVerdict(False, "unavailable", MSG_UNAVAILABLE)
+        return GeoVerdict(False, "unavailable", MSG_UNAVAILABLE), ""
 
     verdict = assess_lookup(payload)
     if not verdict.allowed:
         logger.info("Checkout blocked ip=%s code=%s", ip, verdict.code)
+    return verdict, _country_code(payload)
+
+
+def message_for(code: str) -> str:
+    if code == "outside_uae":
+        return MSG_OUTSIDE
+    if code == "vpn":
+        return MSG_VPN
+    if code == "suspicious":
+        return MSG_SUSPICIOUS
+    return MSG_UNAVAILABLE
+
+
+def check_order_ip(ip: str) -> GeoVerdict:
+    """Call ipapi.is. Any failure blocks the order."""
+    verdict, _country = lookup_ip_details(ip)
     return verdict

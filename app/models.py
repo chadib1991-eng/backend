@@ -78,6 +78,11 @@ class Order(Base):
     attribution = Column(JSONB, nullable=False, default=dict)
     client_ip = Column(Text, nullable=False, default="")
     user_agent = Column(Text, nullable=False, default="")
+    # Set from the same UAE / VPN check used at checkout. Dashboard counts only allowed rows.
+    geo_qualified = Column(Boolean, nullable=False, default=False)
+    geo_code = Column(Text, nullable=False, default="")
+    country_code = Column(Text, nullable=False, default="")
+    channel = Column(Text, nullable=False, default="")
     sheet_synced_at = Column(DateTime(timezone=True), nullable=True)
     sheet_error = Column(Text, nullable=True)
     capi_sent_at = Column(DateTime(timezone=True), nullable=True)
@@ -110,8 +115,31 @@ class AnalyticsEvent(Base):
     event_id = Column(Text, nullable=False)
     order_public_id = Column(Text, nullable=True)
     payload = Column(JSONB, nullable=False, default=dict)
+    client_ip = Column(Text, nullable=False, default="")
+    geo_qualified = Column(Boolean, nullable=False, default=False)
+    geo_code = Column(Text, nullable=False, default="")
+    country_code = Column(Text, nullable=False, default="")
+    visitor_id = Column(Text, nullable=False, default="")
+    channel = Column(Text, nullable=False, default="")
+    utm_source = Column(Text, nullable=False, default="")
+    utm_medium = Column(Text, nullable=False, default="")
+    utm_campaign = Column(Text, nullable=False, default="")
+    utm_content = Column(Text, nullable=False, default="")
+    landing_path = Column(Text, nullable=False, default="")
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
         UniqueConstraint("event_name", "event_id", name="uq_analytics_event_dedup"),
     )
+
+
+class IpVerdict(Base):
+    """One ipapi.is result per address, so dashboard traffic does not re-check the same IP."""
+
+    __tablename__ = "ip_verdicts"
+
+    ip = Column(Text, primary_key=True)
+    allowed = Column(Boolean, nullable=False)
+    code = Column(Text, nullable=False)
+    country_code = Column(Text, nullable=False, default="")
+    checked_at = Column(DateTime(timezone=True), nullable=False)

@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     public_site_url: str = "https://sababreeze.com"
 
     sheets_webhook_url: str = ""
+    # Dashboard login. Both must be set or the admin stays closed.
+    admin_username: str = ""
+    admin_password: str = ""
+    # Optional header token for the existing orders API. The dashboard uses the login above.
     admin_token: str = ""
 
     meta_pixel_id: str = ""

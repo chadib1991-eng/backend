@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Order, Product
 from app.services.pricing import price_for, choose_upsell
+from app.services.traffic import channel_from_attribution
 
 
 def next_public_id(db: Session) -> str:
@@ -78,6 +79,9 @@ def create_order(
     attribution: dict,
     client_ip: str,
     user_agent: str,
+    geo_qualified: bool = False,
+    geo_code: str = "",
+    country_code: str = "",
 ) -> Order:
     public_id = next_public_id(db)
     order = Order(
@@ -97,6 +101,10 @@ def create_order(
         attribution=attribution,
         client_ip=client_ip,
         user_agent=user_agent,
+        geo_qualified=geo_qualified,
+        geo_code=geo_code,
+        country_code=country_code,
+        channel=channel_from_attribution(attribution, landing_url),
         created_at=datetime.now(timezone.utc),
     )
     db.add(order)
