@@ -93,7 +93,12 @@ PRODUCTS = [
         "active": True,
         "sort": 1,
         "ingredients": HAIR_INGREDIENTS,
-        "images": ["/images/hair-mist.webp", "/images/hair-mist-life.webp"],
+        "images": [
+            "/images/hair-mist-main.webp",
+            "/images/hair-mist-ingredients.webp",
+            "/images/hair-mist-how.webp",
+            "/images/hair-mist-life.webp",
+        ],
     },
     {
         "slug": LOTION,
@@ -115,6 +120,7 @@ PRODUCTS = [
             "/images/body-lotion-ingredients.webp",
             "/images/body-lotion-how.webp",
             "/images/body-lotion-life.webp",
+            "/images/body-lotion-after.webp",
         ],
     },
     {
@@ -132,7 +138,12 @@ PRODUCTS = [
         "active": True,
         "sort": 3,
         "ingredients": FOOT_INGREDIENTS,
-        "images": ["/images/foot-roll.webp", "/images/foot-roll-life.webp"],
+        "images": [
+            "/images/foot-roll-main.webp",
+            "/images/foot-roll-ingredients.webp",
+            "/images/foot-roll-how.webp",
+            "/images/foot-roll-life.webp",
+        ],
     },
 ]
 
