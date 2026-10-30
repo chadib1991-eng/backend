@@ -110,7 +110,12 @@ PRODUCTS = [
         "active": True,
         "sort": 2,
         "ingredients": LOTION_INGREDIENTS,
-        "images": ["/images/body-lotion.webp", "/images/body-lotion-life.webp"],
+        "images": [
+            "/images/body-lotion-main.webp",
+            "/images/body-lotion-ingredients.webp",
+            "/images/body-lotion-how.webp",
+            "/images/body-lotion-life.webp",
+        ],
     },
     {
         "slug": FOOT,
